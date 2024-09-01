@@ -1,0 +1,50 @@
+#pragma kernel CSMain
+
+struct VertexData
+{
+    float3 position;
+    float3 normal;
+};
+
+RWStructuredBuffer<VertexData> vertices;
+RWStructuredBuffer<int> triangles;
+StructuredBuffer<float3> positions;
+
+int sampleSize;
+int vertexCount;
+
+[numthreads(1024,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= (uint)vertexCount) return;
+
+    int x = id.x % (sampleSize + 1);
+    int y = id.x / (sampleSize + 1);
+
+    // Set vertex position
+    vertices[id.x].position = positions[id.x];
+
+    // Calculate normal (simplified - you might want to improve this)
+    float3 normal = float3(0, 0, -1);
+    if (x > 0 && x < sampleSize && y > 0 && y < sampleSize)
+    {
+        float3 dx = positions[id.x + 1] - positions[id.x - 1];
+        float3 dy = positions[id.x + (sampleSize + 1)] - positions[id.x - (sampleSize + 1)];
+        normal = normalize(cross(dx, dy));
+    }
+    vertices[id.x].normal = normal;
+
+    // Generate triangles
+    if (x < sampleSize && y < sampleSize)
+    {
+        int vertexIndex = y * (sampleSize + 1) + x;
+        int triangleIndex = (y * sampleSize + x) * 6;
+
+        triangles[triangleIndex] = vertexIndex;
+        triangles[triangleIndex + 1] = vertexIndex + sampleSize + 1;
+        triangles[triangleIndex + 2] = vertexIndex + 1;
+        triangles[triangleIndex + 3] = vertexIndex + 1;
+        triangles[triangleIndex + 4] = vertexIndex + sampleSize + 1;
+        triangles[triangleIndex + 5] = vertexIndex + sampleSize + 2;
+    }
+}

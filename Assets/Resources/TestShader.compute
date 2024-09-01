@@ -1,0 +1,59 @@
+#pragma kernel CSMain
+
+struct PositionData
+{
+    float3 position;
+};
+
+StructuredBuffer<PositionData> positions;
+RWStructuredBuffer<float3> outputVertices;
+RWStructuredBuffer<int> triangles;
+
+[numthreads(1024, 1, 1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    int xSize = 20; // These values can be passed from the CPU.
+    int zSize = 20;
+
+    uint vertexPerThread = ((xSize + 1) * (zSize + 1) + 64 - 1) / 64;  // Calculate vertices handled by each thread
+    uint vertexStartIndex = id.x * vertexPerThread;
+    uint vertexEndIndex = min(vertexStartIndex + vertexPerThread, (xSize + 1) * (zSize + 1));
+
+    // Process vertices
+    for (uint vertexIndex = vertexStartIndex; vertexIndex < vertexEndIndex; ++vertexIndex)
+    {
+        int x = vertexIndex % (xSize + 1);
+        int z = vertexIndex / (xSize + 1);
+
+        // Generate vertex position
+        outputVertices[vertexIndex] = float3(x, 0, z);
+
+        // Example normal, in this case it's straight up
+        // If you need to store normals, ensure your structure has space for it
+        // outputNormals[vertexIndex] = float3(0, 1, 0);
+    }
+
+    // Each thread may need to handle multiple triangles
+    uint trianglePerThread = (xSize * zSize * 6 + 64 - 1) / 64;  // Calculate triangles handled by each thread
+    uint triangleStartIndex = id.x * trianglePerThread;
+    uint triangleEndIndex = min(triangleStartIndex + trianglePerThread, xSize * zSize * 6);
+
+    for (uint triangleIndex = triangleStartIndex; triangleIndex < triangleEndIndex; triangleIndex += 6)
+    {
+        uint vertexIndex = triangleIndex / 6;
+        int x = vertexIndex % xSize;
+        int z = vertexIndex / xSize;
+
+        // Generate triangles if within bounds
+        if (x < xSize && z < zSize)
+        {
+            triangles[triangleIndex + 0] = vertexIndex;
+            triangles[triangleIndex + 1] = vertexIndex + xSize + 1;
+            triangles[triangleIndex + 2] = vertexIndex + 1;
+
+            triangles[triangleIndex + 3] = vertexIndex + 1;
+            triangles[triangleIndex + 4] = vertexIndex + xSize + 1;
+            triangles[triangleIndex + 5] = vertexIndex + xSize + 2;
+        }
+    }
+}
